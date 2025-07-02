@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Trading Strategy Analyzer | Monte Carlo Equity-Curve Simulator & Risk Metrics</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <!-- SEO basics -->
+  <meta name="description" content="Free browser-based Trading Strategy Analyzer that runs Monte Carlo simulations, plots 100 equity curves, and instantly reports win-rate, Sharpe ratio, max draw-down and Calmar ratio.">
+  <meta name="keywords" content="trading strategy analyzer, monte carlo trading simulator, equity curve plotter, sharpe ratio calculator, risk metrics tool, backtesting, win rate simulator">
+  <link rel="canonical" href="https://example.com/trading-strategy-analyzer">  <!-- update URL -->
+  <meta name="robots" content="index,follow">
+
+  <!-- Open-Graph / Social cards -->
+  <meta property="og:type"        content="website">
+  <meta property="og:url"         content="https://example.com/trading-strategy-analyzer">
+  <meta property="og:title"       content="Trading Strategy Analyzer | Monte Carlo Equity-Curve Simulator">
+  <meta property="og:description" content="Run thousands of Monte Carlo simulations in-browser, view 100 sample equity curves, and evaluate Sharpe, Calmar & drawdown in seconds.">
+  <meta property="og:image"       content="https://example.com/assets/trading-analyzer-og.png"> <!-- optional preview -->
+  <meta property="og:locale"      content="en_US">
+
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="Trading Strategy Analyzer | Equity-Curve Simulator & Risk Metrics">
+  <meta name="twitter:description" content="Client-side Monte Carlo trading simulator—visualise equity curves and key performance ratios instantly.">
+  <meta name="twitter:image"       content="https://example.com/assets/trading-analyzer-og.png">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0 20px;background:#f9f9fb;color:#2c3e50}
+    header,section,footer{max-width:800px;margin:auto}
+    h1,h2{color:#1a252f}
+    input,button{padding:8px;margin:6px 0 14px;width:100%;max-width:300px;font-size:1rem}
+    button{background:#2e86de;color:#fff;border:none;cursor:pointer}
+    button:hover{background:#1b4f72}
+    pre{background:#ecf0f1;padding:14px;border-radius:5px;white-space:pre-wrap}
+    canvas{margin-top:24px}
+
+    /* segmented toggle */
+    .segmented{display:inline-flex;border:1px solid #2e86de;border-radius:6px;overflow:hidden;margin:6px 0 14px}
+    .segment{flex:1;padding:1px 10px;font-weight:600;color:#2e86de;background:#fff;border:0;cursor:pointer}
+    .segment:not(:last-child){border-right:1px solid #2e86de}
+    .segment.active{background:#2e86de;color:#fff}
+  </style>
+</head>
+
+<body>
+<header>
+  <h1>Trading Strategy Analyzer</h1>
+  <p>Simulate returns and <strong>visualise 100 equity curves</strong> with a clean segmented toggle for trade count.</p>
+</header>
+
+<section>
+  <h2>Simulation Settings</h2>
+  <label>Win Probability (%)</label>
+  <input type="number" id="winProb" value="60" min="0" max="100">
+<br>
+  <label>Return if Win (%)</label>
+  <input type="number" id="winReturn" value="1" step="0.1">
+  <br>
+  <label>Return if Loss (%)</label>
+  <input type="number" id="lossReturn" value="-1" step="0.1">
+  <br>
+  <label>Trades per Simulation</label>
+  <div id="tradeCount" class="segmented">
+    <button class="segment active" data-trades="100">100</button>
+    <button class="segment"         data-trades="252">252</button>
+  </div>
+  <br>
+  <button onclick="runSimulation()">Simulate</button>
+  <pre id="output"></pre>
+  <canvas id="equityChart" width="800" height="400"></canvas>
+</section>
+
+<!-- On-page keyword-rich description -->
+<section id="about">
+  <h2>About This Monte Carlo Trading Simulator</h2>
+  <p>
+    This free, client-side Trading Strategy Analyzer lets traders and quants stress-test a strategy’s win-
+    rate and payoff profile. In one click it runs 1,000 Monte Carlo simulations, draws 100 sample equity
+    curves, and computes Sharpe ratio, Calmar ratio, mean max draw-down and other risk-adjusted metrics.
+    Because everything happens in-browser, no data leaves your computer—ideal for rapid back-testing of
+    proprietary signals, forex systems, crypto bots or equities swing-trades.
+  </p>
+</section>
+
+<footer>
+  <p>Pure client-side JavaScript • Powered by Chart.js • © 2025 Trading-Tools.dev</p>
+</footer>
+
+<!-- FAQ schema for rich-results -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What does the Trading Strategy Analyzer do?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It runs thousands of Monte Carlo simulations to estimate the distribution of returns, plots 100 equity-curve trajectories, and reports risk metrics such as Sharpe ratio, max draw-down and Calmar ratio—all directly in your browser."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my trading data uploaded to a server?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. The simulator is 100 % client-side JavaScript; nothing is transmitted or stored externally."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How can I change the number of trades per simulation?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Use the segmented toggle to switch between 100 and 252 trades, then click “Simulate” to refresh the equity curves and statistics."
+      }
+    }
+  ]
+}
+</script>
+
+<script>
+let equityChart=null;
+
+/* handle segmented-toggle clicks */
+document.querySelectorAll('#tradeCount .segment').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelector('#tradeCount .active').classList.remove('active');
+    btn.classList.add('active');
+  });
+});
+
+function runSimulation(){
+  const winProb = +document.getElementById('winProb').value/100;
+  const winRet  = +document.getElementById('winReturn').value/100;
+  const lossRet = +document.getElementById('lossReturn').value/100;
+  const NUM_TRADES = +document.querySelector('#tradeCount .segment.active').dataset.trades;
+
+  const NUM_SIMS=1000, SAMPLES=100;
+  const finals=[], dds=[], paths=[];
+
+  for(let i=0;i<NUM_SIMS;i++){
+    let eq=1,peak=1,minDD=0,path=[eq];
+    for(let t=0;t<NUM_TRADES;t++){
+      eq*=1+(Math.random()<winProb?winRet:lossRet);
+      peak=Math.max(peak,eq);
+      minDD=Math.min(minDD,(eq-peak)/peak);
+      if(i<SAMPLES) path.push(eq);
+    }
+    if(i<SAMPLES) paths.push(path);
+    finals.push(eq-1); dds.push(minDD);
+  }
+
+  const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+  const std=a=>{
+    const m=mean(a);
+    return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/a.length);
+  };
+
+  const μ=mean(finals), σ=std(finals), sharpe=μ/σ, mdd=mean(dds), calmar=μ/(-mdd);
+
+  document.getElementById('output').textContent=
+`Trades per Simulation: ${NUM_TRADES}
+Win Prob: ${(winProb*100).toFixed(1)}%,  Win Ret: ${(winRet*100).toFixed(2)}%,  Loss Ret: ${(lossRet*100).toFixed(2)}%
+
+${NUM_SIMS} sims • ${SAMPLES} curves shown
+--------------------------------------------
+Mean Final Return: ${(μ*100).toFixed(2)}%
+Std Dev Return:   ${(σ*100).toFixed(2)}%
+Sharpe Ratio:     ${sharpe.toFixed(2)}
+Mean Max Drawdown:${(mdd*100).toFixed(2)}%
+Calmar Ratio:     ${calmar.toFixed(2)}`;
+
+  /* build datasets with unique HSL colours */
+  const labels=Array.from({length:NUM_TRADES+1},(_,i)=>i);
+  const datasets=paths.map((p,i)=>({
+    label:`Run ${i+1}`,
+    data:p,
+    borderColor:`hsl(${Math.round(i*360/SAMPLES)},70%,50%)`,
+    borderWidth:1,
+    pointRadius:0,
+    fill:false,
+    tension:0
+  }));
+
+  if(equityChart) equityChart.destroy();
+  equityChart=new Chart(document.getElementById('equityChart'),{
+    type:'line',
+    data:{labels,datasets},
+    options:{
+      plugins:{
+        legend:{display:false},
+        tooltip:{enabled:false} /* tool-tips OFF */
+      },
+      interaction:{mode:'index',intersect:false},
+      scales:{
+        x:{title:{display:true,text:'Trade #'}},
+        y:{title:{display:true,text:'Equity (start = 1.0)'}}
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
